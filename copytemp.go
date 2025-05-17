@@ -2,13 +2,14 @@ package toast
 
 import (
 	"os"
+	"path/filepath"
 
 	uuid "github.com/nu7hatch/gouuid"
 )
 
 // Copies an image to `%userprofile%\AppData\Local\Temp` to be easily accessible
 
-var lastTmpFile = ""
+var lastTmpFiles = []string{}
 
 func copyBytesTemp(data []byte) (string, error) {
 	dir, err := os.UserCacheDir()
@@ -16,12 +17,12 @@ func copyBytesTemp(data []byte) (string, error) {
 		return "", err
 	}
 	id, _ := uuid.NewV4()
-	out_path := dir + "/temp/" + id.String()
+	out_path := dir + "\\temp\\" + id.String()
 	err = os.WriteFile(out_path, data, 0600)
 	if err != nil {
 		return "", err
 	}
-	lastTmpFile = out_path
+	lastTmpFiles = append(lastTmpFiles, out_path)
 	return out_path, nil
 }
 
@@ -34,6 +35,17 @@ func copyFileTemp(in_path string) (string, error) {
 }
 
 // yay dysfunctional programming!
-func deleteLastTmpFile() {
-	os.Remove(lastTmpFile)
+func deleteLastTmpFiles() {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return
+	}
+	for _, v := range lastTmpFiles {
+		if filepath.Dir(v) != (dir + "\\temp") {
+			// not our files!
+			continue
+		}
+		os.Remove(v)
+	}
+	lastTmpFiles = []string{}
 }

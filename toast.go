@@ -73,15 +73,21 @@ $template = @"
 <toast activationType="{{.ActivationType}}" launch="{{.ActivationArguments}}" duration="{{.Duration}}">
     <visual>
         <binding template="ToastGeneric">
-            {{if .IconTmp}}
-            <image placement="appLogoOverride" src="{{.IconTmp}}" />
+            {{if .Icon}}
+            <image placement="appLogoOverride" src="{{.Icon}}" hint-crop="{{.IconCrop}}" />
             {{end}}
+			{{if .Hero}}
+			<image placement="hero" src="{{.Hero}}" />
+			{{end}}
             {{if .Title}}
             <text><![CDATA[{{.Title}}]]></text>
             {{end}}
             {{if .Message}}
             <text><![CDATA[{{.Message}}]]></text>
             {{end}}
+			{{if .Attribution}}
+			<text placement="attribution"><![CDATA[{{.Attribution}}]]></text>
+			{{end}}
         </binding>
     </visual>
     {{if ne .Audio "silent"}}
@@ -158,10 +164,18 @@ type Notification struct {
 
 	// An optional path to an image on the OS (or a byte slice of it) to display to the left of the title & message.
 	Icon      string
+	IconPath  string
 	IconBytes []byte
+	// Shape of icon, as defined by the `hint-crop` parameter; none for square icon, "circle" for circle
+	IconCrop string
 
-	// ...and a temporary path, used internally and forcefully exported :(
-	IconTmp string
+	// Hero image, a large banner shown above the main notification
+	Hero      string
+	HeroPath  string
+	HeroBytes []byte
+
+	// Attribution text, a small piece of text below the main notification content
+	Attribution string
 
 	// The type of notification level action (like toast.Action)
 	ActivationType string
@@ -212,13 +226,6 @@ func (n *Notification) applyDefaults() {
 
 func (n *Notification) buildXML() (string, error) {
 	var out bytes.Buffer
-	if n.Icon != "" {
-		n.IconTmp, _ = copyFileTemp(n.Icon)
-	}
-	if n.IconBytes != nil {
-		n.IconTmp, _ = copyBytesTemp(n.IconBytes)
-	}
-
 	err := toastTemplate.Execute(&out, n)
 	if err != nil {
 		return "", err
@@ -228,11 +235,28 @@ func (n *Notification) buildXML() (string, error) {
 
 func (n *Notification) Push() error {
 	n.applyDefaults()
+	n.copyImages()
 	xml, err := n.buildXML()
 	if err != nil {
 		return err
 	}
 	return invokeTemporaryScript(xml)
+}
+
+func (n *Notification) copyImages() {
+	if n.IconPath != "" {
+		n.Icon, _ = copyFileTemp(n.IconPath)
+	}
+	if n.IconBytes != nil {
+		n.Icon, _ = copyBytesTemp(n.IconBytes)
+	}
+
+	if n.HeroPath != "" {
+		n.Hero, _ = copyFileTemp(n.HeroPath)
+	}
+	if n.HeroBytes != nil {
+		n.Hero, _ = copyBytesTemp(n.HeroBytes)
+	}
 }
 
 // Returns a toastAudio given a user-provided input (useful for cli apps).
@@ -339,8 +363,8 @@ func invokeTemporaryScript(content string) error {
 	file := filepath.Join(os.TempDir(), id.String()+".ps1")
 	defer os.Remove(file)
 	defer func() {
-		time.Sleep(1 * time.Second) // HACK: race conditions, anyone?
-		deleteLastTmpFile()
+		time.Sleep(2 * time.Second) // FIXME: not a good way to fix race condition
+		deleteLastTmpFiles()
 	}()
 	out := []byte(content)
 	err := os.WriteFile(file, out, 0600)
