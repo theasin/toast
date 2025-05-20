@@ -79,6 +79,9 @@ $template = @"
 			{{if .Hero}}
 			<image placement="hero" src="{{.Hero}}" />
 			{{end}}
+			{{if .Inline}}
+            <image src="{{.Inline}}" />
+            {{end}}
             {{if .Title}}
             <text><![CDATA[{{.Title}}]]></text>
             {{end}}
@@ -174,6 +177,11 @@ type Notification struct {
 	HeroPath  string
 	HeroBytes []byte
 
+	// Inline image, a smaller variant of hero image, shown below the main notification content
+	Inline      string
+	InlinePath  string
+	InlineBytes []byte
+
 	// Attribution text, a small piece of text below the main notification content
 	Attribution string
 
@@ -256,6 +264,13 @@ func (n *Notification) copyImages() {
 	}
 	if n.HeroBytes != nil {
 		n.Hero, _ = copyBytesTemp(n.HeroBytes)
+	}
+
+	if n.InlinePath != "" {
+		n.Inline, _ = copyFileTemp(n.InlinePath)
+	}
+	if n.HeroBytes != nil {
+		n.Inline, _ = copyBytesTemp(n.InlineBytes)
 	}
 }
 
